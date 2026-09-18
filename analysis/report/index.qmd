@@ -70,12 +70,14 @@ via
 [Wikimedia Commons](https://commons.wikimedia.org).*
 
 ::: {.callout-note}
-**Palmer Penguins Series** -- This is part 1 of 5:
-[Part 1](/posts/08-palmerpenguinspart1/) |
-[Part 2](/posts/09-palmerpenguinspart2/) |
-[Part 3](/posts/10-palmerpenguinspart3/) |
-[Part 4](/posts/11-palmerpenguinspart4/) |
-[Part 5](/posts/12-palmerpenguinspart5/)
+**Palmer Penguins Series** -- This is part 1 of the
+five-part modeling sequence; see the end of the post
+for the wider Palmer Penguins arc.
+Part 1 |
+[Part 2](/posts/pp-multiple-regression/) |
+[Part 3](/posts/pp-cross-validation/) |
+[Part 4](/posts/pp-diagnostics/) |
+[Part 5](/posts/pp-random-forest/)
 :::
 
 # Introduction
@@ -127,7 +129,7 @@ The following considerations motivated this exploration:
 
 ## Objectives
 
-By the end of this post, we will have:
+This post sets out to:
 
 1. Conduct a structured exploratory data analysis on
    real ecological data, including summary statistics,
@@ -155,16 +157,23 @@ into penguin morphometrics."}
 
 # Prerequisites and Setup
 
-To follow along with this analysis, one will need
-the following R packages:
+The analysis pipeline that produces the derived data
+and figures for this post uses the following packages:
 
 ```r
 library(palmerpenguins)
 library(tidyverse)
 library(broom)
 library(corrplot)
-library(GGally)
 library(patchwork)
+```
+
+This document itself re-reads the pipeline's saved
+output rather than re-fitting anything, so rendering it
+needs only:
+
+```r
+library(tidyverse)
 library(knitr)
 
 theme_set(theme_minimal(base_size = 12))
@@ -209,14 +218,15 @@ dataset_overview <- tibble::tribble(
   ~"Characteristic", ~"Value",
   "Total Observations",
     as.character(nrow(penguins_clean)),
-  "Variables", "9",
+  "Variables",
+    as.character(ncol(penguins_clean)),
   "Species",
     as.character(
-      nlevels(penguins_clean$species)
+      dplyr::n_distinct(penguins_clean$species)
     ),
   "Islands",
     as.character(
-      nlevels(penguins_clean$island)
+      dplyr::n_distinct(penguins_clean$island)
     ),
   "Year Range",
     paste0(
@@ -338,12 +348,15 @@ kable(
 )
 ```
 
-The 95% confidence intervals for body mass confirm
-that Gentoo penguins (mean approximately 5,092 g) are
-statistically distinct from Adelie (3,706 g) and
-Chinstrap (3,733 g). By contrast, Adelie and
-Chinstrap body mass distributions overlap
-considerably.
+The interval around the Gentoo mean (approximately
+5,092 g) is far removed from those for Adelie
+(3,706 g) and Chinstrap (3,733 g), whereas the Adelie
+and Chinstrap intervals overlap. Note that these
+intervals describe uncertainty about each species
+mean, not the spread of individual penguins, and
+comparing them by eye is a rough guide rather than a
+formal test; the underlying body mass distributions
+of Adelie and Chinstrap overlap more heavily still.
 
 ```{r}
 #| label: fig-species-comparison
@@ -391,7 +404,7 @@ correlation_summary <- tibble::tribble(
     "Moderate positive",
   "Bill Depth",
     round(body_mass_cors["bill_depth_mm"], 3),
-    "Weak negative"
+    "Moderate negative (pooled)"
 )
 
 kable(
@@ -456,10 +469,16 @@ model_summary <- tibble::tribble(
     ),
   "RMSE",
     sprintf("%.1f g", model_metrics$rmse),
-    "Mean prediction error",
+    "Typical prediction error",
+  "Residual Std. Error",
+    sprintf("%.1f g", model_metrics$residual_se),
+    "Error scale adjusted for df",
   "F-statistic",
     sprintf("%.1f", model_metrics$f_statistic),
-    "p < 0.001 (highly significant)"
+    sprintf(
+      "p %s",
+      format.pval(model_metrics$p_value, eps = 0.001)
+    )
 )
 
 kable(
@@ -494,14 +513,23 @@ flipper lengths:
 
 ```{r}
 #| label: predictions-table
-predictions_display <- tibble::tribble(
-  ~"Flipper Length (mm)",
-  ~"Predicted Body Mass (g)",
-  ~"95% CI Lower",
-  ~"95% CI Upper",
-  180, 3637, 3589, 3685,
-  200, 4749, 4712, 4786,
-  220, 5860, 5815, 5905
+example_flippers <- c(180, 200, 220)
+
+prediction_ci <- predict(
+  simple_model,
+  newdata = data.frame(
+    flipper_length_mm = example_flippers
+  ),
+  interval = "confidence"
+)
+
+predictions_display <- tibble::tibble(
+  `Flipper Length (mm)` = example_flippers,
+  `Predicted Body Mass (g)` = round(
+    prediction_ci[, "fit"], 0
+  ),
+  `95% CI Lower` = round(prediction_ci[, "lwr"], 0),
+  `95% CI Upper` = round(prediction_ci[, "upr"], 0)
 )
 
 kable(
@@ -513,9 +541,22 @@ kable(
 )
 ```
 
+```{r}
+#| label: prediction-narrative
+#| echo: false
+fit_200 <- prediction_ci[
+  example_flippers == 200, "fit"
+]
+width_200 <- diff(
+  prediction_ci[example_flippers == 200,
+                c("lwr", "upr")]
+)
+```
+
 A penguin with 200 mm flippers is predicted to weigh
-approximately 4,749 g, with a 95% confidence interval
-spanning only 74 g. The narrow intervals reflect the
+approximately `r format(round(fit_200), big.mark = ",")` g,
+with a 95% confidence interval spanning only
+`r round(width_200)` g. The narrow intervals reflect the
 strong linear relationship, though they should be
 interpreted cautiously near the extremes of the
 observed flipper length range (172--231 mm).
@@ -524,12 +565,12 @@ observed flipper length range (172--231 mm).
 #| label: fig-regression-model
 #| fig-cap: "Simple linear regression of body mass
 #|   on flipper length with 95% confidence band.
-#|   Points are coloured by species."
+#|   Points are colored by species."
 #| fig-alt: "Scatter plot with fitted regression
 #|   line showing positive relationship between
 #|   flipper length (170-230 mm) and body mass
-#|   (2500-6500 g). Grey confidence band surrounds
-#|   the line. Points are coloured by species,
+#|   (2500-6500 g). Gray confidence band surrounds
+#|   the line. Points are colored by species,
 #|   revealing Gentoo in the upper right and Adelie
 #|   and Chinstrap in the lower left."
 knitr::include_graphics(
@@ -554,21 +595,21 @@ assumptions_check <- tibble::tribble(
     "Relationship appears approximately linear",
     "Met",
   "Independence",
-    "Observations are independent",
-    "Met",
+    "Assumed from the sampling design; not testable here",
+    "Assumed",
   "Normality",
     "Residuals approximately normal",
     "Reasonable",
   "Homoscedasticity",
-    "Variance constant across range",
-    "Violated by species",
+    "Residual spread differs by species",
+    "Violated",
   "Outliers",
     sprintf(
       "%d observations >2.5 SD", nrow(outliers)
     ),
     "Present",
   "Residual Std. Error",
-    sprintf("%.1f grams", model_metrics$rmse),
+    sprintf("%.1f grams", model_metrics$residual_se),
     "Acceptable"
 )
 
@@ -578,28 +619,54 @@ kable(
 )
 ```
 
+```{r}
+#| label: species-residuals
+#| echo: false
+species_resid <- model_predictions |>
+  group_by(species) |>
+  summarise(mean_resid = mean(residuals), .groups = "drop")
+
+resid_of <- function(sp) {
+  round(
+    species_resid$mean_resid[species_resid$species == sp]
+  )
+}
+```
+
 The most informative diagnostic is the residual plot
-below, which reveals distinct species-level
-clustering. Gentoo residuals tend to be positive
-(the model under-predicts their mass), while Adelie
-and Chinstrap residuals are more evenly distributed.
-This pattern is a clear signal that species
-membership carries information the model does not
-yet capture.
+below. The species separate along the horizontal axis
+simply because their flipper lengths differ, which is
+expected and not itself a fault; what matters is the
+vertical offset. The mean residual is
+`r resid_of("Chinstrap")` g for Chinstrap,
+`r sprintf("%+d", resid_of("Adelie"))` g for Adelie, and
+`r sprintf("%+d", resid_of("Gentoo"))` g for Gentoo: the
+model over-predicts Chinstrap mass by a clear margin
+while under-predicting the other two species more
+modestly. A model that ignores species therefore does
+not merely lose precision, it makes errors whose
+direction depends on which species the penguin belongs
+to. This is a clear signal that species membership
+carries information the model does not yet capture.
 
 ```{r}
 #| label: fig-diagnostics
-#| fig-cap: "Standardised residuals versus
-#|   predicted values, coloured by species.
-#|   Species-level clustering indicates that
-#|   the simple model omits an important
-#|   predictor."
-#| fig-alt: "Scatter plot of standardised residuals
-#|   versus predicted body mass. Points are coloured
-#|   by species, showing that Gentoo, Adelie, and
-#|   Chinstrap form distinct clusters rather than a
-#|   random scatter, indicating model
-#|   misspecification."
+#| fig-cap: "Standardized residuals versus
+#|   predicted values, colored by species, with
+#|   dashed lines at +/- 2 SD. Chinstrap residuals
+#|   sit below zero more often than the other two
+#|   species, the signature of an omitted
+#|   categorical predictor."
+#| fig-alt: "Scatter plot of standardized residuals
+#|   versus predicted body mass, with dashed
+#|   reference lines at plus and minus 2 standard
+#|   deviations. Adelie and Chinstrap points are
+#|   intermixed below about 4400 g predicted mass
+#|   and Gentoo points lie above it, reflecting the
+#|   species difference in flipper length. Chinstrap
+#|   points are shifted downward relative to zero,
+#|   showing that the model over-predicts that
+#|   species."
 knitr::include_graphics(
   "figures/model-diagnostics.png"
 )
@@ -637,6 +704,8 @@ fig-alt="Stylized image of penguins, used as a
 visual break between the analysis sections and the
 reflective concluding sections."}
 
+# What Did We Learn?
+
 ## Lessons Learned
 
 ### Conceptual Understanding
@@ -648,8 +717,10 @@ reflective concluding sections."}
 - The species-level clustering in residuals
   demonstrates why biological context must inform
   statistical modeling; ignoring species produces a
-  model that systematically under-predicts Gentoo
-  mass and over-predicts for smaller species.
+  model whose error has a species-dependent
+  direction, over-predicting Chinstrap mass by
+  roughly 200 g while under-predicting Adelie and
+  Gentoo.
 - Simpson's Paradox appears in the bill depth
   correlation: negative when pooled, positive within
   species. This is a textbook example that arises
@@ -778,12 +849,13 @@ of body mass (r = 0.873, R-squared = 0.762),
 confirming that a single morphometric measurement
 carries substantial information about body condition.
 Second, the simple model has an RMSE of approximately
-393 g, acceptable for broad field estimates but
+`r sprintf("%.0f", model_metrics$rmse)` g,
+acceptable for broad field estimates but
 insufficient for precise individual predictions.
 Third, species-level residual clustering indicates
 that including species as a predictor will
 substantially improve the model, as confirmed in
-Part 2, where R-squared exceeds 0.860. Fourth,
+Part 2, where R-squared reaches 0.849. Fourth,
 Simpson's Paradox in the bill depth correlation
 underscores the importance of stratified analysis in
 ecological data and serves as a useful reminder that
@@ -794,9 +866,11 @@ pooled associations can mislead.
 
 In Part 2, adding species information will improve
 the model's R-squared from
-`r round(model_metrics$r_squared, 3)` to over
-0.860---demonstrating why biological context matters
-in ecological modeling.
+`r round(model_metrics$r_squared, 3)` to
+0.849---demonstrating why biological context matters
+in ecological modeling. Adding more morphometric
+measurements instead, without species, will turn out
+to achieve almost nothing.
 :::
 
 # See Also
@@ -804,17 +878,17 @@ in ecological modeling.
 ## Series Posts
 
 - [Part 2: Multiple Regression and Species
-  Effects](../palmerpenguinspart2/): Adding
+  Effects](../pp-multiple-regression/): Adding
   species as a predictor and fitting multiple
   regression.
 - [Part 3: Advanced Models and
-  Cross-Validation](../palmerpenguinspart3/):
+  Cross-Validation](../pp-cross-validation/):
   Model comparison via cross-validation.
 - [Part 4: Model Diagnostics and
-  Interpretation](../palmerpenguinspart4/):
+  Interpretation](../pp-diagnostics/):
   Comprehensive assumption checking.
 - [Part 5: Random Forest vs Linear
-  Models](../palmerpenguinspart5/): Comparing
+  Models](../pp-random-forest/): Comparing
   parametric and non-parametric approaches.
 
 ## Key Resources
@@ -856,12 +930,12 @@ scripts:
 
 ```bash
 git clone <repository-url>
-cd posts/palmerpenguinspart1
+cd posts/pp-eda
 
 make docker-build
-make docker-post-render
+make docker-render-qmd
 
-open index.html
+open analysis/report/index.html
 ```
 
 Alternatively, run each script individually:
@@ -870,7 +944,7 @@ Alternatively, run each script individually:
 Rscript analysis/scripts/01_prepare_data.R
 Rscript analysis/scripts/02_fit_models.R
 Rscript analysis/scripts/03_generate_figures.R
-quarto render index.qmd
+quarto render analysis/report/index.qmd
 ```
 
 ## Environment Information
@@ -919,13 +993,22 @@ Feedback is welcome for:
 This post is part of the *Palmer Penguins Analysis Arc* series.
 Recommended reading order:
 
-0. **Precursor: [zzcollab Analysis Profile Walkthrough](../zc-analysis-profile-walkthrough/)** --
-   set up the reproducible compendium used throughout this series
-1. **Post 50: Palmer Penguins Part 1: Exploratory Data Analysis** (this post)
-2. Post 51: [Palmer Penguins Part 2: Multiple Regression](../pp-multiple-regression/)
-3. Post 52: [Palmer Penguins Part 3: Cross-Validation](../pp-cross-validation/)
-4. Post 53: [Palmer Penguins Part 4: Model Diagnostics](../pp-diagnostics/)
-5. Post 54: [Palmer Penguins Part 5: Random Forest versus Linear](../pp-random-forest/)
-6. Post 55: [Predictive Modeling of Penguin Body Mass](../pp-body-mass-prediction/)
-7. Post 56: [Functional Plot Generation with purrr](../pp-grouped-plots-with-purrr/)
+0. **Precursor: [zzcollab Analysis Profile
+   Walkthrough](../zc-analysis-profile-walkthrough/)** --
+   set up the reproducible compendium used throughout
+   this series
+1. **Post 50: Palmer Penguins Part 1: Exploratory Data
+   Analysis** (this post)
+2. Post 51: [Palmer Penguins Part 2: Multiple
+   Regression](../pp-multiple-regression/)
+3. Post 52: [Palmer Penguins Part 3:
+   Cross-Validation](../pp-cross-validation/)
+4. Post 53: [Palmer Penguins Part 4: Model
+   Diagnostics](../pp-diagnostics/)
+5. Post 54: [Palmer Penguins Part 5: Random Forest
+   versus Linear](../pp-random-forest/)
+6. Post 55: [Predictive Modeling of Penguin Body
+   Mass](../pp-body-mass-prediction/)
+7. Post 56: [Functional Plot Generation with
+   purrr](../pp-grouped-plots-with-purrr/)
 

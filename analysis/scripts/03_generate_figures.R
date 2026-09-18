@@ -42,12 +42,14 @@ p_species <- ggplot(species_summary, aes(x = species, y = n, fill = species)) +
   geom_text(aes(label = paste0(n, "\n(", percentage, "%)")),
             vjust = -0.5, size = 3.5) +
   scale_fill_manual(values = penguin_colors) +
+  # Headroom so the tallest bar's two-line label is not clipped
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
   labs(title = "Species Distribution", x = "Species", y = "Count") +
   theme_minimal() + theme(legend.position = "none")
 
 p_relationship <- ggplot(penguins_clean, aes(x = flipper_length_mm, y = body_mass_g, color = species)) +
   geom_point(alpha = 0.7, size = 1.5) +
-  geom_smooth(method = "lm", se = FALSE, size = 0.8) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 0.8) +
   scale_color_manual(values = penguin_colors) +
   labs(title = "Flipper Length vs Body Mass",
        x = "Flipper Length (mm)", y = "Body Mass (g)", color = "Species") +

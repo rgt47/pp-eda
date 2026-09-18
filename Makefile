@@ -15,14 +15,15 @@ IMAGE_TAG = $(GIT_SHA)
 help:
 	@echo "Available targets:"
 	@echo ""
-	@echo "  Validation (NO HOST R REQUIRED!):"
+	@echo "  Validation (runs zzrenvcheck on the host; requires local R):"
 	@echo "    check-renv            - Full validation: strict + auto-fix (recommended)"
 	@echo "    check-renv-no-fix     - Validation only, no auto-install"
 	@echo "    check-renv-no-strict  - Standard mode (skip tests/, vignettes/)"
+	@echo "    ensure-zzrenvcheck    - Install zzrenvcheck on the host if missing"
 	@echo ""
 	@echo "  Native R - requires local R installation:"
 	@echo "    document, build, check, install, vignettes, test, deps"
-	@echo "    check-renv-ci (legacy)"
+	@echo "    check-renv-ci (legacy alias for check-renv)"
 	@echo ""
 	@echo "  Docker - works without local R:"
 	@echo "    r                     - Start container (RECOMMENDED! Auto-detects profile, mounts cache)"
@@ -63,27 +64,38 @@ test:
 deps:
 	R --quiet -e "devtools::install_deps(dependencies = TRUE)"
 
-# Validate package dependencies (Pure shell, NO HOST R REQUIRED!)
+# Validate package dependencies (zzrenvcheck on the HOST, requires host R)
 # Checks that all packages used in code are in DESCRIPTION and renv.lock
-# Full validation with strict mode, auto-fix, and verbose output (DEFAULT behavior)
-# Scans all directories (root, R/, scripts/, analysis/, tests/, vignettes/, inst/)
+# Validation is static analysis: it reads R/, analysis/, scripts/ (plus tests/
+# and vignettes/ in strict mode) together with DESCRIPTION and renv.lock, and
+# queries the repos for versions. It never needs the container's library.
+# Host repos are pinned to the image's PPM snapshot (parsed from the
+# Dockerfile) so versions resolved here match the container; falls back to
+# CRAN when no Dockerfile is present.
+PPM_REPO := $(shell sed -n 's/.*RENV_CONFIG_REPOS_OVERRIDE="\([^"]*\)".*/\1/p' Dockerfile 2>/dev/null | head -1)
+PPM_REPO := $(if $(PPM_REPO),$(PPM_REPO),https://cloud.r-project.org)
+HOST_CHECK := Rscript -e "options(repos = c(CRAN = '$(PPM_REPO)'))" -e
+
+# Install zzrenvcheck on the host if missing (validation tool)
+ensure-zzrenvcheck:
+	@Rscript -e "if (!requireNamespace('zzrenvcheck', quietly = TRUE)) { install.packages('remotes'); remotes::install_github('rgt47/zzrenvcheck', upgrade = 'never') }"
+
+# Full validation with strict mode and auto-fix (DEFAULT behavior)
 # Auto-adds missing packages to DESCRIPTION and renv.lock
 # Run this before `git commit` to catch issues locally (prevents CI failures)
-check-renv:
-	@bash modules/validation.sh --fix --strict --verbose
+check-renv: ensure-zzrenvcheck
+	$(HOST_CHECK) "zzrenvcheck::check_packages(auto_fix = TRUE, strict = TRUE)"
 
 # Validation only, no auto-fix (report issues without modifying files)
-check-renv-no-fix:
-	@bash modules/validation.sh --no-fix --strict --verbose
+check-renv-no-fix: ensure-zzrenvcheck
+	$(HOST_CHECK) "zzrenvcheck::check_packages(auto_fix = FALSE, strict = TRUE)"
 
 # Standard mode validation (skip tests/, vignettes/, inst/ directories)
-check-renv-no-strict:
-	@bash modules/validation.sh --fix --verbose
+check-renv-no-strict: ensure-zzrenvcheck
+	$(HOST_CHECK) "zzrenvcheck::check_packages(auto_fix = TRUE, strict = FALSE)"
 
-# Legacy: R-based validation (for CI/CD that has R pre-installed)
-# This is the old approach, kept for backward compatibility
-check-renv-ci:
-	@bash modules/validation.sh --fix --strict --verbose
+# Legacy alias retained for backward compatibility with older CI configs
+check-renv-ci: check-renv
 
 # Docker targets (work without local R)
 # Docker-first workflow:
@@ -195,7 +207,7 @@ docker-run: check-renv
 	esac
 	@echo ""
 	@echo "📋 Post-session validation: checking for new packages..."
-	@bash modules/validation.sh --fix --strict --verbose || echo "⚠️  Package validation failed - see above for details"
+	@$(HOST_CHECK) "zzrenvcheck::check_packages(auto_fix = TRUE, strict = TRUE)" || echo "⚠️  Package validation failed - see above for details"
 	@if [ -f renv.lock ]; then \
 		if ! touch renv.lock; then \
 			echo "⚠️  Warning: Failed to restore renv.lock timestamp (file may be readonly)" >&2; \
@@ -234,4 +246,4 @@ docker-prune-all:
 	@echo "✅ Docker cleanup complete"
 	@make docker-disk-usage
 
-.PHONY: all document build check install vignettes test deps check-renv check-renv-no-fix check-renv-no-strict check-renv-ci docker-build docker-rebuild docker-build-log docker-push-team docker-document docker-build-pkg docker-check docker-test docker-vignettes docker-render docker-render-qmd docker-rstudio docker-run r docker-check-renv docker-check-renv-fix clean docker-clean docker-disk-usage docker-prune-cache docker-prune-all help
+.PHONY: all document build check install vignettes test deps ensure-zzrenvcheck check-renv check-renv-no-fix check-renv-no-strict check-renv-ci docker-build docker-rebuild docker-build-log docker-push-team docker-document docker-build-pkg docker-check docker-test docker-vignettes docker-render docker-render-qmd docker-rstudio docker-run r docker-check-renv docker-check-renv-fix clean docker-clean docker-disk-usage docker-prune-cache docker-prune-all help

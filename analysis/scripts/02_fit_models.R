@@ -24,7 +24,9 @@ cat("📊 Simple Linear Model Results:\n")
 cat("===============================\n")
 cat(sprintf("R-squared: %.3f (%.1f%% of variance explained)\n",
             model_metrics$r.squared, model_metrics$r.squared * 100))
-cat(sprintf("RMSE: %.1f grams\n", sigma(simple_model)))
+cat(sprintf("RMSE: %.1f grams\n",
+            sqrt(mean(residuals(simple_model)^2))))
+cat(sprintf("Residual standard error: %.1f grams\n", sigma(simple_model)))
 cat(sprintf("F-statistic: %.1f (p < 0.001)\n", model_metrics$statistic))
 
 # Model equation with confidence intervals
@@ -43,7 +45,8 @@ write_csv(model_coefficients, "analysis/data/derived_data/model_coefficients.csv
 # Save model metrics
 metrics_df <- data.frame(
   r_squared = model_metrics$r.squared,
-  rmse = sigma(simple_model),
+  rmse = sqrt(mean(residuals(simple_model)^2)),
+  residual_se = sigma(simple_model),
   f_statistic = model_metrics$statistic,
   p_value = model_metrics$p.value,
   observations = model_metrics$nobs
