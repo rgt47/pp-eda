@@ -24,3 +24,5 @@ Imports:
     tibble,
     tidyverse,
 Config/testthat/edition: 3
+Suggests: 
+    dplyr
