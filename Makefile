@@ -182,9 +182,11 @@ r: ## Interactive R session (Docker/Podman, nix, apptainer; host R fallback if n
 	HOME_DIR="/home/$$USERNAME"; \
 	echo "🐳 Starting R ($$PROFILE)..."; \
 	echo ""; \
+	mkdir -p $$HOME/.cache/R/renv 2>/dev/null || true; \
 	$(CONTAINER_RUNTIME) run --rm -it \
 		--platform $(PLATFORM) \
 		-v $$(pwd):$$HOME_DIR/project \
+		-v $$HOME/.cache/R/renv:/opt/renv/cache \
 		-w $$HOME_DIR/project \
 		-e KITTY_WINDOW_ID="$${KITTY_WINDOW_ID:-}" \
 		-e ITERM_SESSION_ID="$${ITERM_SESSION_ID:-}" \
