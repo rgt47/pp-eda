@@ -1,11 +1,12 @@
 # ============================================================================
-# zzvim-R .Rprofile.local v2.0.0
+# zzvim-R .Rprofile.local v2.1.0
 # ============================================================================
 # Unified Graphics System - Plots and Tables
 # Display plots and tables in kitty terminal with unified history.
 # Architecture: PDF master + PNG preview for both plots and tables.
 #
 # Version history:
+#   v2.1.0 (2026-10): Erase the .zz() call line before showing sourced code
 #   v2.0.0 (2026-10): Define .zz() here so it is never echoed at the prompt
 #   v1.9.0 (2026-02): Unified graphics system - plots + tables
 #   v1.8.0 (2026-01): Plot HUD path resolution fix
@@ -509,4 +510,8 @@ if (.terminal != "none" && Sys.info()["sysname"] %in% c("Darwin", "Linux")) {
 # Defined here (sourced silently at startup) so it never appears as echoed
 # terminal input.  The plugin writes submitted code to .zz.R and calls
 # .zz(".zz.R"); source() executes it with echo, unlink() deletes it.
-.zz <- function(f) { source(f, echo = TRUE); unlink(f) }
+.zz <- function(f) {
+  if (isatty(stdout())) cat("\033[1A\033[2K\r", sep = "")
+  source(f, echo = TRUE)
+  unlink(f)
+}
