@@ -247,7 +247,14 @@ options(
 )
 
 # ==========================================
-# Part 4: Personal Customizations (always)
+# Part 4: zzvim-R code-submission helper (baseline)
+# ==========================================
+# .Rprofile.local overrides this with the cursor-erase version. This fallback
+# ensures code submission works if .Rprofile.local is absent or fails to load.
+.zz <- function(f) { source(f, echo = TRUE); unlink(f) }
+
+# ==========================================
+# Part 5: Personal Customizations (always)
 # ==========================================
 if (file.exists(".Rprofile.local")) {
   tryCatch(
