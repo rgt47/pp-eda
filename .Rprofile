@@ -104,10 +104,14 @@ if (!renv_enabled) {
   }
 
   # renv consent (skips first-time prompts)
+  # synchronized.check is disabled in the container: the library is baked at
+  # docker build time and zzrenvcheck handles sync detection post-session.
+  # Leaving it enabled scans ~200 packages at every startup (~20-30s overhead).
   options(
     renv.consent = TRUE,
     renv.config.install.prompt = FALSE,
-    renv.config.auto.snapshot = FALSE
+    renv.config.auto.snapshot = FALSE,
+    renv.config.synchronized.check = FALSE
   )
 
   # Helper function for initializing renv without prompts
