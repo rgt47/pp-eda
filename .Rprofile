@@ -114,7 +114,7 @@ if (!renv_enabled) {
   renv_init_quiet <- function() {
     renv::init(
       bare = TRUE,
-      settings = list(snapshot.type = "implicit"),
+      settings = list(snapshot.type = "explicit"),
       force = TRUE,
       restart = FALSE,
       load = FALSE
