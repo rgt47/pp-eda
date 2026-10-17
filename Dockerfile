@@ -10,14 +10,16 @@ FROM rocker/verse:4.5.2@sha256:dc10cdb6d16680c2946c87c3ba8aa5d58506cf965525dd940
 
 # OCI image labels for reproducibility provenance and tooling integration.
 # base_digest records the resolved sha256 of the rocker base at build time;
-# ppm_snapshot records the dated PPM URL used to pin package binaries.
-LABEL org.opencontainers.image.created="2026-09-19T01:27:02Z" \
-      org.opencontainers.image.licenses="GPL-3.0-or-later" \
+# ppm_snapshot records the dated PPM URL used to pin package binaries. The
+# image.created label is deliberately not written here: a timestamp in this
+# file would change its text, and so any hash of it, on every regeneration.
+# 'zzcollab rebuild' adds it as a build-time --label instead.
+LABEL org.opencontainers.image.licenses="GPL-3.0-or-later" \
       zzcollab.template.version="0.3.0" \
       zzcollab.r.version="4.5.2" \
       zzcollab.base.image="rocker/verse:4.5.2" \
       zzcollab.base.digest="sha256:dc10cdb6d16680c2946c87c3ba8aa5d58506cf965525dd940cea92d4c4a92f27" \
-      zzcollab.ppm.snapshot="2026-09-17" \
+      zzcollab.ppm.snapshot="2026-10-15" \
       zzcollab.install.mode="renv"
 
 ARG USERNAME=analyst
@@ -25,11 +27,16 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 # RENV_PATHS_LIBRARY is outside the project bind-mount so the baked library
 # is not shadowed at runtime. ZZCOLLAB_AUTO_RESTORE=false disables the
-# startup restore so the image library is authoritative.
+# startup restore so the image library is authoritative. OMP_NUM_THREADS=1
+# runs OpenMP-threaded code (including OpenMP builds of OpenBLAS) serially,
+# so reduction order, and hence floating-point results, does not depend on
+# the host's core count. Override per run if speed matters more than
+# bit-level agreement.
 ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 TZ=UTC \
+    OMP_NUM_THREADS=1 \
     RENV_PATHS_LIBRARY=/opt/renv/library \
     RENV_PATHS_CACHE=/opt/renv/cache \
-    RENV_CONFIG_REPOS_OVERRIDE="https://packagemanager.posit.co/cran/__linux__/noble/2026-09-17" \
+    RENV_CONFIG_REPOS_OVERRIDE="https://packagemanager.posit.co/cran/__linux__/noble/2026-10-15" \
     ZZCOLLAB_CONTAINER=true \
     ZZCOLLAB_INSTALL_MODE=renv \
     ZZCOLLAB_AUTO_RESTORE=false
@@ -37,9 +44,11 @@ ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 TZ=UTC \
 # No additional system dependencies required
 
 # Configure R to use Posit Package Manager for pre-compiled binaries
-RUN echo 'options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux__/noble/2026-09-17"))' \
+RUN echo 'options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux__/noble/2026-10-15"))' \
         >> /usr/local/lib/R/etc/Rprofile.site && \
     echo 'options(HTTPUserAgent = sprintf("R/%s R (%s)", getRversion(), paste(getRversion(), R.version["platform"], R.version["arch"], R.version["os"])))' \
+        >> /usr/local/lib/R/etc/Rprofile.site && \
+    echo 'options(renv.config.sandbox.enabled = FALSE)' \
         >> /usr/local/lib/R/etc/Rprofile.site
 
 # Install R dev tooling only (languageserver/styler/lintr, config-gated;
