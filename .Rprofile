@@ -83,6 +83,17 @@ if (!renv_enabled) {
     Sys.setenv(RENV_PATHS_CACHE = file.path(Sys.getenv("HOME"), ".cache/R/renv"))
   }
 
+  # renv consent (skips first-time prompts)
+  # synchronized.check MUST be set before source("renv/activate.R"):
+  # renv runs the sync scan during load, so setting it after is too late.
+  # The scan of ~200 packages causes 20-30s startup overhead in the container.
+  options(
+    renv.consent = TRUE,
+    renv.config.install.prompt = FALSE,
+    renv.config.auto.snapshot = FALSE,
+    renv.config.synchronized.check = FALSE
+  )
+
   # Activate renv (set project-local library paths)
   if (file.exists("renv/activate.R")) {
     source("renv/activate.R")
@@ -102,17 +113,6 @@ if (!renv_enabled) {
               renv_lib_root, call. = FALSE)
     }
   }
-
-  # renv consent (skips first-time prompts)
-  # synchronized.check is disabled in the container: the library is baked at
-  # docker build time and zzrenvcheck handles sync detection post-session.
-  # Leaving it enabled scans ~200 packages at every startup (~20-30s overhead).
-  options(
-    renv.consent = TRUE,
-    renv.config.install.prompt = FALSE,
-    renv.config.auto.snapshot = FALSE,
-    renv.config.synchronized.check = FALSE
-  )
 
   # Helper function for initializing renv without prompts
   renv_init_quiet <- function() {
