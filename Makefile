@@ -102,6 +102,9 @@ check-renv-no-fix: ensure-zzrenvcheck ## Validate deps on host: report only, no 
 check-renv-no-strict: ensure-zzrenvcheck ## Validate deps on host: skip tests/ and vignettes/
 	$(HOST_CHECK) "zzrenvcheck::check_packages(auto_fix = TRUE, strict = FALSE)"
 
+check-renv-slim: ensure-zzrenvcheck ## Validate deps, skipping packages already in the Docker image
+	$(HOST_CHECK) "zzrenvcheck::check_packages(auto_fix = TRUE, strict = TRUE, skip_image_pkgs = TRUE)"
+
 snapshot: ensure-zzrenvcheck ## renv snapshot (container) then validate deps (host); run before commit
 	$(DOCKER_RUN) Rscript -e "renv::hydrate(); renv::snapshot(prompt = FALSE)"
 	$(HOST_CHECK) "zzrenvcheck::check_packages(auto_fix = TRUE, strict = TRUE)"
@@ -186,7 +189,7 @@ r: ## Interactive R session (Docker/Podman, nix, apptainer; host R fallback if n
 	$(CONTAINER_RUNTIME) run --rm -it \
 		--platform $(PLATFORM) \
 		-v $$(pwd):$$HOME_DIR/project \
-		-v $$HOME/.cache/R/renv:/opt/renv/cache \
+		-v $$HOME/.cache/R/renv:$$HOME_DIR/.cache/R/renv \
 		-w $$HOME_DIR/project \
 		-e KITTY_WINDOW_ID="$${KITTY_WINDOW_ID:-}" \
 		-e ITERM_SESSION_ID="$${ITERM_SESSION_ID:-}" \
@@ -196,9 +199,14 @@ r: ## Interactive R session (Docker/Podman, nix, apptainer; host R fallback if n
 		$(PACKAGE_NAME) R || true; \
 	echo ""; \
 	echo "📋 Post-session validation..."; \
-	if Rscript -e "quit(status = if(requireNamespace('zzrenvcheck', quietly=TRUE)) 0L else 1L)" 2>/dev/null; then \
-		Rscript -e "zzrenvcheck::check_packages(auto_fix = TRUE, strict = TRUE)" \
+	if [ -z "$(HOST_RSCRIPT)" ]; then \
+		echo "No R on the host: validating in the project container."; \
+		$(MAKE) --no-print-directory check-renv || echo "⚠️  Package validation failed"; \
+		touch /tmp/zzvim-r-hook-ran; \
+	elif Rscript -e "quit(status = if(requireNamespace('zzrenvcheck', quietly=TRUE)) 0L else 1L)" 2>/dev/null; then \
+		Rscript -e "zzrenvcheck::check_packages(auto_fix = TRUE, strict = TRUE, skip_image_pkgs = TRUE)" \
 		|| echo "⚠️  Package validation failed"; \
+		touch /tmp/zzvim-r-hook-ran; \
 	else \
 		echo "zzrenvcheck not installed on host."; \
 		printf "Install now? [Y/n] "; \
