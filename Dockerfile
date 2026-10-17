@@ -47,8 +47,6 @@ ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 TZ=UTC \
 RUN echo 'options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux__/noble/2026-10-15"))' \
         >> /usr/local/lib/R/etc/Rprofile.site && \
     echo 'options(HTTPUserAgent = sprintf("R/%s R (%s)", getRversion(), paste(getRversion(), R.version["platform"], R.version["arch"], R.version["os"])))' \
-        >> /usr/local/lib/R/etc/Rprofile.site && \
-    echo 'options(renv.config.sandbox.enabled = FALSE)' \
         >> /usr/local/lib/R/etc/Rprofile.site
 
 # Install R dev tooling only (languageserver/styler/lintr, config-gated;
@@ -127,6 +125,12 @@ RMD
 R -e 'options(tinytex.install_packages = TRUE); for (f in list.files("/tmp/texwarmup", pattern = "[.]Rmd$", full.names = TRUE)) rmarkdown::render(f, quiet = TRUE)'
 rm -rf "$d"
 WARMUP
+
+# Disable renv sandbox so rocker's site-library packages (tidyverse, etc.)
+# remain visible alongside the renv project library. Placed after WARMUP to
+# avoid busting its BuildKit cache layer on every config change.
+RUN echo 'options(renv.config.sandbox.enabled = FALSE)' \
+        >> /usr/local/lib/R/etc/Rprofile.site
 
 # Dependency install (self-adapting, INSTALL_MODE=renv). The block
 # below is emitted by generation-time branch on renv.lock presence. In renv
