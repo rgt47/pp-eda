@@ -65,6 +65,7 @@ else
   DOCKER_RUN = $(CONTAINER_RUNTIME) run --rm --platform $(PLATFORM) \
     -v "$(CURDIR)":$(CONTAINER_HOME)/project \
     -e ZZ_HOST_ROOT="$(CURDIR)" -e TZ="$(HOST_TZ)" \
+    -e ZZCOLLAB_AUTO_SNAPSHOT=false \
     -w $(CONTAINER_HOME)/project $(PACKAGE_NAME)
 endif
 
@@ -327,6 +328,7 @@ TEST_SOURCES := $(wildcard R/*.R) $(wildcard inst/tinytest/*.R)
 		-v "$(CURDIR)":$(CONTAINER_HOME)/project \
 		-w $(CONTAINER_HOME)/project \
 		-e ZZCOLLAB_CONTAINER=true \
+		-e ZZCOLLAB_AUTO_SNAPSHOT=false \
 		$(PACKAGE_NAME) \
 		Rscript -e "if (dir.exists('inst/tinytest')) \
 		  tinytest::run_test_dir('inst/tinytest') \
