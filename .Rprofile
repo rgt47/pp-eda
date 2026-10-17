@@ -208,7 +208,10 @@ if (!renv_enabled) {
           renv::snapshot(prompt = FALSE)
           TRUE
         }, error = function(e) {
-          warning("Auto-snapshot failed: ", conditionMessage(e), call. = FALSE)
+          msg <- conditionMessage(e)
+          if (!grepl("argument is of length zero|no packages", msg, ignore.case = TRUE)) {
+            warning("Auto-snapshot failed: ", msg, call. = FALSE)
+          }
           FALSE
         })
 

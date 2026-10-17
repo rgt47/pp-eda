@@ -210,6 +210,7 @@ r: ## Interactive R session (Docker/Podman, nix, apptainer; host R fallback if n
 		-e TERM_PROGRAM="$${TERM_PROGRAM:-}" \
 		-e GHOSTTY_RESOURCES_DIR="$${GHOSTTY_RESOURCES_DIR:-}" \
 		-e WEZTERM_EXECUTABLE="$${WEZTERM_EXECUTABLE:-}" \
+		-e ZZCOLLAB_AUTO_SNAPSHOT=false \
 		$(PACKAGE_NAME) R || true; \
 	echo ""; \
 	echo "📋 Post-session validation..."; \
