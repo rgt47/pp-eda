@@ -124,7 +124,7 @@ snapshot: ensure-zzrenvcheck ## renv snapshot (container) then validate deps (ho
 	$(HOST_CHECK) "zzrenvcheck::check_packages(auto_fix = TRUE, strict = TRUE)"
 
 reset-lock: ensure-zzrenvcheck ## Rebuild renv.lock from a fresh host code scan, refreshing ALL versions
-	$(HOST_CHECK) "zzrenvcheck::check_packages(fresh = TRUE, strict = TRUE)"
+	$(HOST_CHECK) "zzrenvcheck::check_packages(fresh = TRUE, strict = TRUE, skip_image_pkgs = TRUE)"
 
 style: ## Format R code with styler (in container; needs code-quality enabled)
 	$(DOCKER_RUN) Rscript -e "styler::style_dir('R'); if (dir.exists('analysis')) styler::style_dir('analysis')"
