@@ -214,7 +214,8 @@ r: ## Interactive R session (Docker/Podman, nix, apptainer; host R fallback if n
 		case "$$_ans" in \
 			[Nn]*) echo "Skipping validation." ;; \
 			*) Rscript -e "install.packages('remotes'); remotes::install_github('rgt47/zzrenvcheck', upgrade = 'never')" \
-			   && Rscript -e "zzrenvcheck::check_packages(auto_fix = TRUE, strict = TRUE)" \
+			   && Rscript -e "zzrenvcheck::check_packages(auto_fix = TRUE, strict = TRUE, skip_image_pkgs = TRUE)" \
+			   && touch /tmp/zzvim-r-hook-ran \
 			   || echo "⚠️  Package validation failed" ;; \
 		esac; \
 	fi
