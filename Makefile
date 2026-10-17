@@ -88,10 +88,24 @@ help: ## Show this help
 # when no Dockerfile is present.
 PPM_REPO := $(shell sed -n 's/.*RENV_CONFIG_REPOS_OVERRIDE="\([^"]*\)".*/\1/p' Dockerfile 2>/dev/null | head -1)
 PPM_REPO := $(if $(PPM_REPO),$(PPM_REPO),https://cloud.r-project.org)
-HOST_CHECK := Rscript -e "options(repos = c(CRAN = '$(PPM_REPO)'))" -e
+HOST_RSCRIPT := $(shell command -v Rscript 2>/dev/null)
+IMAGE_R_VERSION := $(shell sed -n 's/^FROM [^:]*:\([0-9][0-9.]*\).*/\1/p' Dockerfile 2>/dev/null | head -1)
+ZZ_TOOLS_LIB ?= $(HOME)/.cache/zzcollab/tools-lib/$(PLATFORM)/R-$(IMAGE_R_VERSION)
+ifeq ($(HOST_RSCRIPT),)
+  TOOL_RSCRIPT = { $(CONTAINER_RUNTIME) image inspect $(PACKAGE_NAME) >/dev/null 2>&1 || \
+      { echo "No R on the host and no image '$(PACKAGE_NAME)': run 'make docker-build' first." >&2; exit 1; }; } && \
+    mkdir -p "$(ZZ_TOOLS_LIB)" && \
+    $(CONTAINER_RUNTIME) run --rm --platform $(PLATFORM) \
+      -v "$(CURDIR)":$(CONTAINER_HOME)/project -v "$(ZZ_TOOLS_LIB)":/opt/zztools \
+      -e R_LIBS=/opt/zztools -e ZZCOLLAB_AUTO_SNAPSHOT=false \
+      -w $(CONTAINER_HOME)/project $(PACKAGE_NAME) Rscript --vanilla
+else
+  TOOL_RSCRIPT = Rscript
+endif
+HOST_CHECK := $(TOOL_RSCRIPT) -e "options(repos = c(CRAN = '$(PPM_REPO)'))" -e
 
-ensure-zzrenvcheck: ## Install zzrenvcheck on the host if missing (validation tool)
-	@Rscript -e "if (!requireNamespace('zzrenvcheck', quietly = TRUE)) { install.packages('remotes'); remotes::install_github('rgt47/zzrenvcheck', upgrade = 'never') }"
+ensure-zzrenvcheck: ## Install zzrenvcheck if missing (host R, else a tools library for the container)
+	@$(HOST_CHECK) "if (!requireNamespace('zzrenvcheck', quietly = TRUE) || utils::packageVersion('zzrenvcheck') < '0.9.0') { install.packages('remotes'); remotes::install_github('rgt47/zzrenvcheck', upgrade = 'never') }"
 
 check-renv: ensure-zzrenvcheck ## Validate deps on host: strict + auto-fix (run before commit)
 	$(HOST_CHECK) "zzrenvcheck::check_packages(auto_fix = TRUE, strict = TRUE)"
