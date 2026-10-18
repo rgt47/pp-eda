@@ -54,11 +54,11 @@ RUN echo 'options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux
 # never in renv.lock). Project packages come from renv::restore(), not here.
 RUN R -e "install.packages(c('languageserver'), Ncpus = max(1L, parallel::detectCores()))"
 
-# Install TinyTeX and bookdown. rocker/tidyverse ships the tinytex R package
-# but not the TeX Live distribution or bookdown; rocker/verse pre-installs
-# both, but verse has no arm64 image variant. Install here so PDF rendering
-# (including the warmup) works for the non-root user.
-RUN R -e "tinytex::install_tinytex(); install.packages('bookdown')"
+# Install TinyTeX and bookdown. rocker/tidyverse ships the tinytex R
+# package but not the TeX Live distribution or bookdown; rocker/verse
+# pre-installs both, but verse has no arm64 image variant. Install here
+# so PDF rendering (including the warmup) works.
+RUN R -e "tinytex::install_tinytex(); install.packages('curl'); install.packages('bookdown')"
 
 # Pre-bake the LaTeX package closure at build time (as root, where tlmgr can
 # write) so PDF rendering works for the non-root user with no runtime install.
