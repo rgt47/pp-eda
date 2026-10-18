@@ -19,7 +19,7 @@ LABEL org.opencontainers.image.licenses="GPL-3.0-or-later" \
       zzcollab.r.version="4.5.2" \
       zzcollab.base.image="rocker/verse:4.5.2" \
       zzcollab.base.digest="sha256:dc10cdb6d16680c2946c87c3ba8aa5d58506cf965525dd940cea92d4c4a92f27" \
-      zzcollab.ppm.snapshot="2026-10-15" \
+      zzcollab.ppm.snapshot="2026-10-16" \
       zzcollab.install.mode="renv"
 
 ARG USERNAME=analyst
@@ -36,15 +36,16 @@ ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 TZ=UTC \
     OMP_NUM_THREADS=1 \
     RENV_PATHS_LIBRARY=/opt/renv/library \
     RENV_PATHS_CACHE=/opt/renv/cache \
-    RENV_CONFIG_REPOS_OVERRIDE="https://packagemanager.posit.co/cran/__linux__/noble/2026-10-15" \
+    RENV_CONFIG_REPOS_OVERRIDE="https://packagemanager.posit.co/cran/__linux__/noble/2026-10-16" \
     ZZCOLLAB_CONTAINER=true \
     ZZCOLLAB_INSTALL_MODE=renv \
-    ZZCOLLAB_AUTO_RESTORE=false
+    ZZCOLLAB_AUTO_RESTORE=false \
+    XDG_CACHE_HOME=/tmp
 
 # No additional system dependencies required
 
 # Configure R to use Posit Package Manager for pre-compiled binaries
-RUN echo 'options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux__/noble/2026-10-15"))' \
+RUN echo 'options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux__/noble/2026-10-16"))' \
         >> /usr/local/lib/R/etc/Rprofile.site && \
     echo 'options(HTTPUserAgent = sprintf("R/%s R (%s)", getRversion(), paste(getRversion(), R.version["platform"], R.version["arch"], R.version["os"])))' \
         >> /usr/local/lib/R/etc/Rprofile.site
@@ -127,8 +128,9 @@ rm -rf "$d"
 WARMUP
 
 # Disable renv sandbox so rocker's site-library packages (tidyverse, etc.)
-# remain visible alongside the renv project library. Placed after WARMUP to
-# avoid busting its BuildKit cache layer on every config change.
+# remain visible alongside the renv project library. Placed after tools_install
+# (which contains the LaTeX WARMUP) to avoid busting its BuildKit cache layer
+# on every config change.
 RUN echo 'options(renv.config.sandbox.enabled = FALSE)' \
         >> /usr/local/lib/R/etc/Rprofile.site
 
