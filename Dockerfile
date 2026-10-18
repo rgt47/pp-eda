@@ -19,7 +19,7 @@ LABEL org.opencontainers.image.licenses="GPL-3.0-or-later" \
       zzcollab.r.version="4.5.2" \
       zzcollab.base.image="rocker/tidyverse:4.5.2" \
       zzcollab.base.digest="sha256:4813816ad695004b738ccfff8513ce43f017e6fe78fb273aafd0bee4d4e1070a" \
-      zzcollab.ppm.snapshot="2026-10-16" \
+      zzcollab.ppm.snapshot="2026-10-17" \
       zzcollab.install.mode="renv"
 
 ARG USERNAME=analyst
@@ -36,7 +36,7 @@ ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 TZ=UTC \
     OMP_NUM_THREADS=1 \
     RENV_PATHS_LIBRARY=/opt/renv/library \
     RENV_PATHS_CACHE=/opt/renv/cache \
-    RENV_CONFIG_REPOS_OVERRIDE="https://packagemanager.posit.co/cran/__linux__/noble/2026-10-16" \
+    RENV_CONFIG_REPOS_OVERRIDE="https://packagemanager.posit.co/cran/__linux__/noble/2026-10-17" \
     ZZCOLLAB_CONTAINER=true \
     ZZCOLLAB_INSTALL_MODE=renv \
     ZZCOLLAB_AUTO_RESTORE=false \
@@ -45,7 +45,7 @@ ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 TZ=UTC \
 # No additional system dependencies required
 
 # Configure R to use Posit Package Manager for pre-compiled binaries
-RUN echo 'options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux__/noble/2026-10-16"))' \
+RUN echo 'options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux__/noble/2026-10-17"))' \
         >> /usr/local/lib/R/etc/Rprofile.site && \
     echo 'options(HTTPUserAgent = sprintf("R/%s R (%s)", getRversion(), paste(getRversion(), R.version["platform"], R.version["arch"], R.version["os"])))' \
         >> /usr/local/lib/R/etc/Rprofile.site
@@ -54,10 +54,11 @@ RUN echo 'options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux
 # never in renv.lock). Project packages come from renv::restore(), not here.
 RUN R -e "install.packages(c('languageserver'), Ncpus = max(1L, parallel::detectCores()))"
 
-# Install TinyTeX. rocker/tidyverse includes the tinytex R package but not the
-# TeX Live distribution; rocker/verse pre-installs it, but verse has no arm64
-# image. Install it here so PDF rendering works for the non-root user.
-RUN R -e "tinytex::install_tinytex()"
+# Install TinyTeX and bookdown. rocker/tidyverse ships the tinytex R package
+# but not the TeX Live distribution or bookdown; rocker/verse pre-installs
+# both, but verse has no arm64 image variant. Install here so PDF rendering
+# (including the warmup) works for the non-root user.
+RUN R -e "tinytex::install_tinytex(); install.packages('bookdown')"
 
 # Pre-bake the LaTeX package closure at build time (as root, where tlmgr can
 # write) so PDF rendering works for the non-root user with no runtime install.
