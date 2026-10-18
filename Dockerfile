@@ -40,8 +40,7 @@ ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 TZ=UTC \
     ZZCOLLAB_CONTAINER=true \
     ZZCOLLAB_INSTALL_MODE=renv \
     ZZCOLLAB_AUTO_RESTORE=false \
-    XDG_CACHE_HOME=/tmp \
-    TINYTEX_DIR=/opt/tinytex
+    XDG_CACHE_HOME=/tmp
 
 # No additional system dependencies required
 
@@ -55,15 +54,32 @@ RUN echo 'options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux
 # never in renv.lock). Project packages come from renv::restore(), not here.
 RUN R -e "install.packages(c('languageserver'), Ncpus = max(1L, parallel::detectCores()))"
 
-# Install TinyTeX to /opt/tinytex (system-wide, not root's HOME) so the
-# non-root analyst user can use it. rocker/verse pre-installs TinyTeX;
-# tidyverse does not. tlmgr path add symlinks lualatex/xelatex/pdflatex
-# into /usr/local/bin so quarto can call them without knowing the
-# arch-specific bin path. bookdown and curl are in verse but not tidyverse.
-RUN R -e "tinytex::install_tinytex(dir='/opt/tinytex', add_path=FALSE)" && \
-    /opt/tinytex/bin/*/tlmgr path add && \
-    chmod -R 777 /opt/tinytex && \
+# Install TeX Live with rocker's own script, which the tidyverse image
+# bundles and which is what rocker runs to build verse on top of tidyverse.
+# Preferred over tinytex::install_tinytex(): that validates its result
+# against default_inst() (~/.TinyTeX) rather than the dir= it was given, so
+# it reports failure on a complete tree, and its tlmgr path add step is the
+# one rocker deliberately disabled upstream. The script installs
+# scheme-infraonly to /usr/local/texlive with trees under /opt/texlive,
+# creates the arch-agnostic bin/linux symlink, opens the trees to
+# root:staff, and appends PATH to Renviron.site so R sessions find tlmgr
+# and the engines. bookdown and curl are in verse but not tidyverse.
+#
+# The repository argument pins TeX Live, and is not optional in practice.
+# The script defaults to https://mirror.ctan.org, a redirector that resolves
+# to an arbitrary mirror per build: besides leaving the TeX package set
+# unpinned, some mirrors it returns serve certificates this image cannot
+# verify, so the default fails the build outright. A frozen tlnet-final
+# snapshot is reachable, deterministic, and pins TeX Live the way
+# RENV_CONFIG_REPOS_OVERRIDE above pins CRAN.
+RUN /rocker_scripts/install_texlive.sh \
+        https://ftp.tu-chemnitz.de/pub/tug/historic/systems/texlive/2025/tlnet-final && \
     R -e "install.packages(c('curl', 'bookdown'))"
+
+# Renviron.site (written above) only covers R sessions. Add the stable
+# arch-agnostic bin/linux symlink to PATH as well so a shell-side
+# 'quarto render --to pdf' finds lualatex without going through R.
+ENV PATH="/usr/local/texlive/bin/linux:${PATH}"
 
 # Pre-bake the LaTeX package closure at build time (as root, where tlmgr can
 # write) so PDF rendering works for the non-root user with no runtime install.
@@ -73,9 +89,14 @@ RUN R -e "tinytex::install_tinytex(dir='/opt/tinytex', add_path=FALSE)" && \
 # ~5 min of build). A single tlmgr call fetches them in ~20-30s; the render
 # below then finds everything present and acts as a fast smoke test that also
 # self-heals any package this list omits.
+#
+# lualatex-math and unicode-math are required because quarto renders PDF with
+# lualatex by default, which the warm-up renders below also exercise. The
+# earlier warm-ups covered only pdflatex and xelatex, so the first real
+# 'quarto render --to pdf' was left to install them at run time.
 RUN <<'WARMUP'
 set -eu
-R -e "tinytex::tlmgr_install(c('amsfonts','booktabs','setspace','multirow','wrapfig','float','colortbl','pdflscape','tabu','varwidth','threeparttable','threeparttablex','environ','trimspaces','ulem','makecell','mathtools','fancyhdr','caption','enumitem','fp','pgf','pgfplots','siunitx','lineno'))"
+R -e "tinytex::tlmgr_install(c('amsfonts','booktabs','setspace','multirow','wrapfig','float','colortbl','pdflscape','tabu','varwidth','threeparttable','threeparttablex','environ','trimspaces','ulem','makecell','mathtools','fancyhdr','caption','enumitem','fp','pgf','pgfplots','siunitx','lineno','lualatex-math','unicode-math'))"
 d=/tmp/texwarmup
 mkdir -p "$d"
 cat > "$d/01-report.Rmd" <<'RMD'
@@ -134,8 +155,27 @@ output:
 # Kitchen sink
 Math $\mathcal{N}(\mu, \sigma^2)$.
 RMD
+cat > "$d/03-lualatex.Rmd" <<'RMD'
+---
+title: warm-up lualatex
+output:
+  pdf_document:
+    latex_engine: lualatex
+    extra_dependencies:
+      - unicode-math
+      - amsmath
+---
+# LuaLaTeX
+Math $\mathcal{N}(\mu, \sigma^2)$ and $\sum_{i=1}^{n} x_i^2$.
+RMD
 R -e 'options(tinytex.install_packages = TRUE); for (f in list.files("/tmp/texwarmup", pattern = "[.]Rmd$", full.names = TRUE)) rmarkdown::render(f, quiet = TRUE)'
 rm -rf "$d"
+# Re-open the TeX trees. install_texlive.sh chmods them, but every root-run
+# tlmgr call above rewrites texlive.tlpdb as root-owned 0644, which leaves
+# the non-root user unable to run tlmgr at all. Without this, tinytex's
+# run-time self-heal for any package the list above omits fails with
+# 'open(>/usr/local/texlive/tlpkg/texlive.tlpdb) failed: Permission denied'.
+chmod -R 777 /usr/local/texlive /opt/texlive
 WARMUP
 
 # Disable renv sandbox so rocker's site-library packages (tidyverse, etc.)
