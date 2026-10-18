@@ -4,9 +4,9 @@
 # BASE_IMAGE is parsed out of this file by the project Makefile ('make r'
 # derives the profile label from it); keep it even though the FROM below uses
 # a fully-substituted literal and does not reference the ARG.
-ARG BASE_IMAGE=rocker/verse
+ARG BASE_IMAGE=rocker/tidyverse
 
-FROM rocker/verse:4.5.2@sha256:dc10cdb6d16680c2946c87c3ba8aa5d58506cf965525dd940cea92d4c4a92f27
+FROM rocker/tidyverse:4.5.2@sha256:4813816ad695004b738ccfff8513ce43f017e6fe78fb273aafd0bee4d4e1070a
 
 # OCI image labels for reproducibility provenance and tooling integration.
 # base_digest records the resolved sha256 of the rocker base at build time;
@@ -17,8 +17,8 @@ FROM rocker/verse:4.5.2@sha256:dc10cdb6d16680c2946c87c3ba8aa5d58506cf965525dd940
 LABEL org.opencontainers.image.licenses="GPL-3.0-or-later" \
       zzcollab.template.version="0.3.0" \
       zzcollab.r.version="4.5.2" \
-      zzcollab.base.image="rocker/verse:4.5.2" \
-      zzcollab.base.digest="sha256:dc10cdb6d16680c2946c87c3ba8aa5d58506cf965525dd940cea92d4c4a92f27" \
+      zzcollab.base.image="rocker/tidyverse:4.5.2" \
+      zzcollab.base.digest="sha256:4813816ad695004b738ccfff8513ce43f017e6fe78fb273aafd0bee4d4e1070a" \
       zzcollab.ppm.snapshot="2026-10-16" \
       zzcollab.install.mode="renv"
 
@@ -53,6 +53,11 @@ RUN echo 'options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux
 # Install R dev tooling only (languageserver/styler/lintr, config-gated;
 # never in renv.lock). Project packages come from renv::restore(), not here.
 RUN R -e "install.packages(c('languageserver'), Ncpus = max(1L, parallel::detectCores()))"
+
+# Install TinyTeX. rocker/tidyverse includes the tinytex R package but not the
+# TeX Live distribution; rocker/verse pre-installs it, but verse has no arm64
+# image. Install it here so PDF rendering works for the non-root user.
+RUN R -e "tinytex::install_tinytex()"
 
 # Pre-bake the LaTeX package closure at build time (as root, where tlmgr can
 # write) so PDF rendering works for the non-root user with no runtime install.

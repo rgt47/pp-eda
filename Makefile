@@ -31,9 +31,12 @@ RAW_DATA_DIR ?= analysis/data/raw_data
 # Container execution. The mount and work path follow the Dockerfile's
 # ARG USERNAME (default analyst), matching what the `r` target resolves at
 # runtime, so a customised container user is honoured rather than hardcoded.
-# PLATFORM is pinned so every batch container run matches CI and the cached
-# test target rather than the host architecture (the real prior inconsistency).
-PLATFORM       ?= linux/amd64
+# PLATFORM selects the container architecture. Auto-detects the host: arm64
+# hosts use linux/arm64 (native; avoids QEMU emulation that breaks Haskell
+# binaries such as pandoc). Override with make PLATFORM=linux/amd64 when
+# cross-building for CI or comparing amd64-pinned results.
+_HOST_ARCH     := $(shell uname -m)
+PLATFORM       ?= $(if $(filter arm64,$(_HOST_ARCH)),linux/arm64,linux/amd64)
 # Container runtime: docker (default), podman (drop-in for `run`), or apptainer
 # (HPC; executes a SIF built from the project image, no --platform). The default
 # below is the configured zzcollab runtime; override per-invocation with
