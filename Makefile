@@ -289,14 +289,21 @@ check-binaries: ## Audit renv.lock for missing system deps (pre-build)
 		echo "  tools/check-binaries.py not found, skipping audit"; \
 	fi
 
+ZZCOLLAB ?= $(shell command -v zzcollab 2>/dev/null || command -v zzc 2>/dev/null)
+ZZCOLLAB_CHECK = @[ -n "$(ZZCOLLAB)" ] || \
+	{ echo "zzcollab CLI not found on PATH (tried 'zzcollab' and 'zzc'); set ZZCOLLAB=/path/to/zzc" >&2; exit 1; }
+
 docker-build: check-binaries ## Pre-build audit then build image from renv.lock
-	zzcollab rebuild
+	$(ZZCOLLAB_CHECK)
+	"$(ZZCOLLAB)" rebuild
 
 docker-rebuild: ## Rebuild image without cache (force fresh build)
-	zzcollab rebuild --no-cache
+	$(ZZCOLLAB_CHECK)
+	"$(ZZCOLLAB)" rebuild --no-cache
 
 docker-build-log: ## Build image with detailed logs (for debugging)
-	zzcollab rebuild --log
+	$(ZZCOLLAB_CHECK)
+	"$(ZZCOLLAB)" rebuild --log
 
 ##@ Apptainer (HPC)
 
