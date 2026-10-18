@@ -355,6 +355,9 @@ docker-script:
 docker-render-qmd: ## Render the Quarto report (analysis/report/index.qmd)
 	$(DOCKER_RUN) quarto render analysis/report/index.qmd
 
+host-render-qmd: ## Render index.qmd with host quarto (native arm64 pandoc -- use when container pandoc fails under QEMU)
+	quarto render analysis/report/index.qmd
+
 docker-render-book: ## Render the Quarto book (archetype: book -> analysis/report/)
 	$(DOCKER_RUN) quarto render analysis/report
 
