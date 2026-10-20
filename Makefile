@@ -21,10 +21,10 @@ IMAGE_TAG = $(GIT_SHA)
 REPORT ?= analysis/report/report.Rmd
 
 # Report rendered by docker-render-qmd/host-render-qmd: analysis/report/
-# index.qmd or index.Rmd, whichever exists (a project is expected to have
+# index.qmd or report.Rmd, whichever exists (a project is expected to have
 # only one). Override with FILE=path, or a bare name resolved against
 # analysis/report/ (make docker-render-qmd-pdf FILE=test.Rmd).
-REPORT_DOC := $(firstword $(wildcard analysis/report/index.qmd) $(wildcard analysis/report/index.Rmd))
+REPORT_DOC := $(firstword $(wildcard analysis/report/index.qmd) $(wildcard analysis/report/report.Rmd))
 ifneq ($(strip $(FILE)),)
   ifeq ($(wildcard $(FILE)),)
     REPORT_DOC := analysis/report/$(FILE)
@@ -375,7 +375,7 @@ docker-render: ## Render REPORT (default analysis/report/report.Rmd)
 docker-script:
 	$(DOCKER_RUN) Rscript -e "source('$(SCRIPT)')"
 
-docker-render-qmd: ## Render the report (default: analysis/report/index.qmd or index.Rmd); FILE=path FORMAT=pdf|html|... to override
+docker-render-qmd: ## Render the report (default: analysis/report/index.qmd or report.Rmd); FILE=path FORMAT=pdf|html|... to override
 	$(DOCKER_RUN) quarto render $(REPORT_DOC) $(if $(FORMAT),--to $(FORMAT))
 
 docker-render-qmd-pdf: ## Render report to PDF; FILE=path to override default
