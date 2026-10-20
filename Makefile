@@ -20,6 +20,19 @@ IMAGE_TAG = $(GIT_SHA)
 # Report rendered by docker-render (override: make docker-render REPORT=path)
 REPORT ?= analysis/report/report.Rmd
 
+# Report rendered by docker-render-qmd/host-render-qmd: analysis/report/
+# index.qmd or index.Rmd, whichever exists (a project is expected to have
+# only one). Override with FILE=path, or a bare name resolved against
+# analysis/report/ (make docker-render-qmd-pdf FILE=test.Rmd).
+REPORT_DOC := $(firstword $(wildcard analysis/report/index.qmd) $(wildcard analysis/report/index.Rmd))
+ifneq ($(strip $(FILE)),)
+  ifeq ($(wildcard $(FILE)),)
+    REPORT_DOC := analysis/report/$(FILE)
+  else
+    REPORT_DOC := $(FILE)
+  endif
+endif
+
 # Docker Hub account for team image push/pull. Override on the command line
 # (make docker-push-team DOCKERHUB_ACCOUNT=youraccount) or export it.
 DOCKERHUB_ACCOUNT ?=
@@ -362,11 +375,17 @@ docker-render: ## Render REPORT (default analysis/report/report.Rmd)
 docker-script:
 	$(DOCKER_RUN) Rscript -e "source('$(SCRIPT)')"
 
-docker-render-qmd: ## Render the Quarto report (analysis/report/index.qmd)
-	$(DOCKER_RUN) quarto render analysis/report/index.qmd
+docker-render-qmd: ## Render the report (default: analysis/report/index.qmd or index.Rmd); FILE=path FORMAT=pdf|html|... to override
+	$(DOCKER_RUN) quarto render $(REPORT_DOC) $(if $(FORMAT),--to $(FORMAT))
 
-host-render-qmd: ## Render index.qmd with host quarto (native arm64 pandoc -- use when container pandoc fails under QEMU)
-	quarto render analysis/report/index.qmd
+docker-render-qmd-pdf: ## Render report to PDF; FILE=path to override default
+	$(MAKE) docker-render-qmd FORMAT=pdf FILE=$(FILE)
+
+docker-render-qmd-html: ## Render report to HTML; FILE=path to override default
+	$(MAKE) docker-render-qmd FORMAT=html FILE=$(FILE)
+
+host-render-qmd: ## Render the report with host quarto (native arm64 pandoc -- use when container pandoc fails under QEMU); FILE=path FORMAT=pdf|html|... to override
+	quarto render $(REPORT_DOC) $(if $(FORMAT),--to $(FORMAT))
 
 docker-render-book: ## Render the Quarto book (archetype: book -> analysis/report/)
 	$(DOCKER_RUN) quarto render analysis/report
@@ -474,4 +493,4 @@ docker-prune-all: ## Deep clean all unused Docker resources (system-wide)
 	@echo "✅ Docker cleanup complete"
 	@$(MAKE) docker-disk-usage
 
-.PHONY: document build check install vignettes test deps snapshot reset-lock ensure-zzrenvcheck style lint check-renv check-renv-no-fix check-renv-no-strict check-binaries docker-build docker-rebuild docker-build-log docker-push-team docker-pull-team docker-document docker-build-pkg docker-check docker-test docker-vignettes docker-render docker-script docker-render-qmd docker-render-book docker-rstudio rstudio r test-container docker-check-renv docker-check-renv-fix hash-data verify-data clean docker-clean docker-disk-usage docker-prune-cache docker-prune-all help
+.PHONY: document build check install vignettes test deps snapshot reset-lock ensure-zzrenvcheck style lint check-renv check-renv-no-fix check-renv-no-strict check-binaries docker-build docker-rebuild docker-build-log docker-push-team docker-pull-team docker-document docker-build-pkg docker-check docker-test docker-vignettes docker-render docker-script docker-render-qmd docker-render-qmd-pdf docker-render-qmd-html docker-render-book docker-rstudio rstudio r test-container docker-check-renv docker-check-renv-fix hash-data verify-data clean docker-clean docker-disk-usage docker-prune-cache docker-prune-all help
