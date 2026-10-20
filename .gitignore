@@ -1,3 +1,7 @@
+# Make's cached-build stamp files (.make/tests-passed, .make/data-prepared,
+# .make/model-fit, .make/figures-generated); see Makefile.
+.make/
+
 # R specific
 .Rhistory
 .Rapp.history

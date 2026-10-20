@@ -375,7 +375,32 @@ docker-render: ## Render REPORT (default analysis/report/report.Rmd)
 docker-script:
 	$(DOCKER_RUN) Rscript -e "source('$(SCRIPT)')"
 
-docker-render-qmd: ## Render the report (default: analysis/report/index.qmd or report.Rmd); FILE=path FORMAT=pdf|html|... to override
+# --- Analysis pipeline (data -> model -> figures) -------------------------
+# index.qmd only embeds analysis/figures/*.png via knitr::include_graphics;
+# it has no awareness of the scripts that produced them. Without this chain,
+# editing 03_generate_figures.R (or an upstream script) and re-rendering
+# silently re-embeds the stale, already-committed PNG. Each stage below is a
+# stamp file (same pattern as .make/tests-passed above): it re-runs its
+# script only when the script itself, its stage's prerequisite stamp, or
+# renv.lock has changed since the last successful run.
+.make/data-prepared: analysis/scripts/01_prepare_data.R renv.lock
+	@mkdir -p .make
+	$(DOCKER_RUN) Rscript -e "source('analysis/scripts/01_prepare_data.R')"
+	@touch $@
+
+.make/model-fit: analysis/scripts/02_fit_models.R .make/data-prepared renv.lock
+	@mkdir -p .make
+	$(DOCKER_RUN) Rscript -e "source('analysis/scripts/02_fit_models.R')"
+	@touch $@
+
+.make/figures-generated: analysis/scripts/03_generate_figures.R .make/model-fit renv.lock
+	@mkdir -p .make
+	$(DOCKER_RUN) Rscript -e "source('analysis/scripts/03_generate_figures.R')"
+	@touch $@
+
+pipeline: .make/figures-generated ## Regenerate derived data, model, and figures if any script/input changed
+
+docker-render-qmd: .make/figures-generated ## Render the report (default: analysis/report/index.qmd or report.Rmd); FILE=path FORMAT=pdf|html|... to override
 	$(DOCKER_RUN) quarto render $(REPORT_DOC) $(if $(FORMAT),--to $(FORMAT))
 
 docker-render-qmd-pdf: ## Render report to PDF; FILE=path to override default
@@ -384,7 +409,7 @@ docker-render-qmd-pdf: ## Render report to PDF; FILE=path to override default
 docker-render-qmd-html: ## Render report to HTML; FILE=path to override default
 	$(MAKE) docker-render-qmd FORMAT=html FILE=$(FILE)
 
-host-render-qmd: ## Render the report with host quarto (native arm64 pandoc -- use when container pandoc fails under QEMU); FILE=path FORMAT=pdf|html|... to override
+host-render-qmd: .make/figures-generated ## Render the report with host quarto (native arm64 pandoc -- use when container pandoc fails under QEMU); FILE=path FORMAT=pdf|html|... to override
 	quarto render $(REPORT_DOC) $(if $(FORMAT),--to $(FORMAT))
 
 docker-render-book: ## Render the Quarto book (archetype: book -> analysis/report/)
@@ -493,4 +518,4 @@ docker-prune-all: ## Deep clean all unused Docker resources (system-wide)
 	@echo "✅ Docker cleanup complete"
 	@$(MAKE) docker-disk-usage
 
-.PHONY: document build check install vignettes test deps snapshot reset-lock ensure-zzrenvcheck style lint check-renv check-renv-no-fix check-renv-no-strict check-binaries docker-build docker-rebuild docker-build-log docker-push-team docker-pull-team docker-document docker-build-pkg docker-check docker-test docker-vignettes docker-render docker-script docker-render-qmd docker-render-qmd-pdf docker-render-qmd-html docker-render-book docker-rstudio rstudio r test-container docker-check-renv docker-check-renv-fix hash-data verify-data clean docker-clean docker-disk-usage docker-prune-cache docker-prune-all help
+.PHONY: document build check install vignettes test deps snapshot reset-lock ensure-zzrenvcheck style lint check-renv check-renv-no-fix check-renv-no-strict check-binaries docker-build docker-rebuild docker-build-log docker-push-team docker-pull-team docker-document docker-build-pkg docker-check docker-test docker-vignettes docker-render docker-script pipeline docker-render-qmd docker-render-qmd-pdf docker-render-qmd-html docker-render-book docker-rstudio rstudio r test-container docker-check-renv docker-check-renv-fix hash-data verify-data clean docker-clean docker-disk-usage docker-prune-cache docker-prune-all help

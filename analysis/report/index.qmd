@@ -18,6 +18,7 @@ cluster-order: 1
 ```{r}
 #| label: setup
 #| echo: false
+
 library(tidyverse)
 library(knitr)
 
@@ -928,6 +929,12 @@ scripts:
 3. **03_generate_figures.R**: Generate
    publication-quality figures from analysis results.
 
+The Makefile declares each script's outputs as depending on the
+script and the prior stage's outputs, so `make docker-render-qmd`
+re-runs only the stages that are stale (or all three, on a fresh
+clone) before rendering -- it does not just re-render against
+whatever derived data and figures happen to already be committed:
+
 ```bash
 git clone <repository-url>
 cd posts/pp-eda
@@ -938,7 +945,15 @@ make docker-render-qmd
 open analysis/report/index.html
 ```
 
-Alternatively, run each script individually:
+To run the pipeline (data, model, figures) without rendering --
+still only re-running stages that are stale:
+
+```bash
+make pipeline
+```
+
+Or run each script individually (outside the container; requires a
+local R environment matching renv.lock):
 
 ```bash
 Rscript analysis/scripts/01_prepare_data.R
