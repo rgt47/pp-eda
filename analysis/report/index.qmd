@@ -215,6 +215,7 @@ of the dataset.
 
 ```{r}
 #| label: dataset-overview
+# styler: off
 dataset_overview <- tibble::tribble(
   ~"Characteristic", ~"Value",
   "Total Observations",
@@ -236,6 +237,7 @@ dataset_overview <- tibble::tribble(
       max(penguins_clean$year)
     )
 )
+# styler: on
 
 kable(
   dataset_overview,
@@ -393,6 +395,7 @@ body_mass_cors <- correlation_matrix[
 ] |>
   sort(decreasing = TRUE)
 
+# styler: off
 correlation_summary <- tibble::tribble(
   ~"Variable",
   ~"Correlation with Body Mass",
@@ -407,6 +410,7 @@ correlation_summary <- tibble::tribble(
     round(body_mass_cors["bill_depth_mm"], 3),
     "Moderate negative (pooled)"
 )
+# styler: on
 
 kable(
   correlation_summary,
@@ -460,6 +464,7 @@ slope <- model_coefficients$estimate[2]
 slope_ci_lower <- model_coefficients$conf.low[2]
 slope_ci_upper <- model_coefficients$conf.high[2]
 
+# styler: off
 model_summary <- tibble::tribble(
   ~"Metric", ~"Value", ~"Interpretation",
   "R-squared",
@@ -481,6 +486,7 @@ model_summary <- tibble::tribble(
       format.pval(model_metrics$p_value, eps = 0.001)
     )
 )
+# styler: on
 
 kable(
   model_summary,
@@ -590,6 +596,7 @@ we must examine the residuals.
 outliers <- model_predictions |>
   filter(abs(standardized_residuals) > 2.5)
 
+# styler: off
 assumptions_check <- tibble::tribble(
   ~"Assumption", ~"Result", ~"Status",
   "Linearity",
@@ -613,6 +620,7 @@ assumptions_check <- tibble::tribble(
     sprintf("%.1f grams", model_metrics$residual_se),
     "Acceptable"
 )
+# styler: on
 
 kable(
   assumptions_check,
