@@ -78,3 +78,6 @@ tmp-pdfcrop*.tex
 .zzc.R
 .zzo.txt
 .zzhud_*
+
+# zzvim-R terminal graphics: plot pane state and show_plot() history
+.graphics/
