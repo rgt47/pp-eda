@@ -72,3 +72,9 @@ npm-debug.log*
 *.aux
 tmp-pdfcrop*.tex
 /index_files/
+
+# zzvim-R scratch files (normally deleted after use)
+.zz.*
+.zzc.R
+.zzo.txt
+.zzhud_*
