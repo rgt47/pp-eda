@@ -34,3 +34,4 @@
 ^index\.qmd$
 ^index\.html$
 ^index_files$
+^\.graphics$
